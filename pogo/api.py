@@ -96,9 +96,9 @@ class PokeAuthSession(object):
         )
 
     def createPTCSession(self, locationLookup='', session=None):
-        session = self.createRequestsSession()
+        instance = self.createRequestsSession()
         logging.info('Creating PTC session for %s', self.username)
-        r = session.get(LOGIN_URL)
+        r = instance.get(LOGIN_URL)
         jdata = json.loads(r.content.decode())
         data = {
             'lt': jdata['lt'],
@@ -107,7 +107,7 @@ class PokeAuthSession(object):
             'username': self.username,
             'password': self.password,
         }
-        authResponse = session.post(LOGIN_URL, data=data)
+        authResponse = instance.post(LOGIN_URL, data=data)
 
         ticket = None
         try:
@@ -123,7 +123,7 @@ class PokeAuthSession(object):
             'grant_type': 'refresh_token',
             'code': ticket,
         }
-        r2 = session.post(LOGIN_OAUTH, data=data1)
+        r2 = instance.post(LOGIN_OAUTH, data=data1)
         self.access_token = re.sub('&expires.*', '', r2.content.decode('utf-8'))
         self.access_token = re.sub('.*access_token=', '', self.access_token)
 

@@ -5,6 +5,7 @@ from POGOProtos.Networking.Envelopes import ResponseEnvelope_pb2
 from POGOProtos.Networking.Envelopes import RequestEnvelope_pb2
 from POGOProtos.Networking.Requests.Messages import EncounterMessage_pb2
 from POGOProtos.Networking.Requests.Messages import FortSearchMessage_pb2
+from POGOProtos.Networking.Requests.Messages import FortDetailsMessage_pb2
 from POGOProtos.Networking.Requests.Messages import CatchPokemonMessage_pb2
 from POGOProtos.Networking.Requests.Messages import GetInventoryMessage_pb2
 from POGOProtos.Networking.Requests.Messages import GetMapObjectsMessage_pb2
@@ -40,7 +41,7 @@ class PogoSession(object):
         self.authProvider = authProvider
         self.accessToken = accessToken
         self.location = location
-        self.state = State()
+        self._state = State()
 
         self.authTicket = None
         self.endpoint = None
@@ -185,23 +186,23 @@ class PogoSession(object):
     # Parse the default responses
     def parseDefault(self, res):
         try:
-            self.state.eggs.ParseFromString(res.returns[1])
-            self.state.inventory.ParseFromString(res.returns[2])
-            self.state.badges.ParseFromString(res.returns[3])
-            self.state.settings.ParseFromString(res.returns[4])
+            self._state.eggs.ParseFromString(res.returns[1])
+            self._state.inventory.ParseFromString(res.returns[2])
+            self._state.badges.ParseFromString(res.returns[3])
+            self._state.settings.ParseFromString(res.returns[4])
         except Exception as e:
             logging.error(e)
             raise GeneralPogoException("Error parsing response. Malformed response")
 
         # Finally make inventory usable
-        items = self.state.inventory.inventory_delta.inventory_items
+        items = self._state.inventory.inventory_delta.inventory_items
         self.inventory = Inventory(items)
 
     # Hooks for those bundled in default
     # Getters
     def getEggs(self):
         self.getProfile()
-        return self.state.eggs
+        return self._state.eggs
 
     def getInventory(self):
         self.getProfile()
@@ -209,24 +210,24 @@ class PogoSession(object):
 
     def getBadges(self):
         self.getProfile()
-        return self.state.badges
+        return self._state.badges
 
     def getDownloadSettings(self):
         self.getProfile()
-        return self.state.settings
+        return self._state.settings
 
     # Check, so we don't have to start another request
     def checkEggs(self):
-        return self.state.eggs
+        return self._state.eggs
 
     def checkInventory(self):
         return self.inventory
 
     def checkBadges(self):
-        return self.state.badges
+        return self._state.badges
 
     def checkDownloadSettings(self):
-        return self.state.settings
+        return self._state.settings
 
     # Core api calls
     # Get profile
@@ -240,10 +241,10 @@ class PogoSession(object):
         res = self.wrapAndRequest(payload)
 
         # Parse
-        self.state.profile.ParseFromString(res.returns[0])
+        self._state.profile.ParseFromString(res.returns[0])
 
         # Return everything
-        return self.state.profile
+        return self._state.profile
 
     # Get Location
     def getMapObjects(self, radius=10):
@@ -267,10 +268,10 @@ class PogoSession(object):
         res = self.wrapAndRequest(payload)
 
         # Parse
-        self.state.mapObjects.ParseFromString(res.returns[0])
+        self._state.mapObjects.ParseFromString(res.returns[0])
 
         # Return everything
-        return self.state.mapObjects
+        return self._state.mapObjects
 
     # Get Location
     def getFortSearch(self, fort):
@@ -291,10 +292,32 @@ class PogoSession(object):
         res = self.wrapAndRequest(payload)
 
         # Parse
-        self.state.fortSearch.ParseFromString(res.returns[0])
+        self._state.fortSearch.ParseFromString(res.returns[0])
 
         # Return everything
-        return self.state.fortSearch
+        return self._state.fortSearch
+
+    # set an Egg into an incubator
+    def getFortDetails(self, fort):
+
+        # Create request
+        payload = [Request_pb2.Request(
+            request_type=RequestType_pb2.FORT_DETAILS,
+            request_message=FortDetailsMessage_pb2.FortDetailsMessage(
+                fort_id=fort.id,
+                latitude=fort.latitude,
+                longitude=fort.longitude,
+            ).SerializeToString()
+        )]
+
+        # Send
+        res = self.wrapAndRequest(payload)
+
+        # Parse
+        self._state.fortDetails.ParseFromString(res.returns[0])
+
+        # Return everything
+        return self._state.fortDetails
 
     # Get encounter
     def encounterPokemon(self, pokemon):
@@ -314,10 +337,10 @@ class PogoSession(object):
         res = self.wrapAndRequest(payload)
 
         # Parse
-        self.state.encounter.ParseFromString(res.returns[0])
+        self._state.encounter.ParseFromString(res.returns[0])
 
         # Return everything
-        return self.state.encounter
+        return self._state.encounter
 
     # Upon Encounter, try and catch
     def catchPokemon(self, pokemon, pokeball=1):
@@ -340,10 +363,10 @@ class PogoSession(object):
         res = self.wrapAndRequest(payload)
 
         # Parse
-        self.state.catch.ParseFromString(res.returns[0])
+        self._state.catch.ParseFromString(res.returns[0])
 
         # Return everything
-        return self.state.catch
+        return self._state.catch
 
     # Evolve Pokemon
     def evolvePokemon(self, pokemon):
@@ -360,10 +383,10 @@ class PogoSession(object):
         res = self.wrapAndRequest(payload)
 
         # Parse
-        self.state.evolve.ParseFromString(res.returns[0])
+        self._state.evolve.ParseFromString(res.returns[0])
 
         # Return everything
-        return self.state.evolve
+        return self._state.evolve
 
     # Transfer Pokemon
     def releasePokemon(self, pokemon):
@@ -380,10 +403,10 @@ class PogoSession(object):
         res = self.wrapAndRequest(payload)
 
         # Parse
-        self.state.release.ParseFromString(res.returns[0])
+        self._state.release.ParseFromString(res.returns[0])
 
         # Return everything
-        return self.state.release
+        return self._state.release
 
     # Throw away items
     def recycleItem(self, item_id, count):
@@ -401,10 +424,10 @@ class PogoSession(object):
         res = self.wrapAndRequest(payload)
 
         # Parse
-        self.state.recycle.ParseFromString(res.returns[0])
+        self._state.recycle.ParseFromString(res.returns[0])
 
         # Return everything
-        return self.state.recycle
+        return self._state.recycle
 
     # set an Egg into an incubator
     def setEgg(self, item, pokemon):
@@ -422,10 +445,10 @@ class PogoSession(object):
         res = self.wrapAndRequest(payload)
 
         # Parse
-        self.state.incubator.ParseFromString(res.returns[0])
+        self._state.incubator.ParseFromString(res.returns[0])
 
         # Return everything
-        return self.state.incubator
+        return self._state.incubator
 
     # These act as more logical functions.
     # Might be better to break out seperately
@@ -447,6 +470,9 @@ class PogoSession(object):
         divisions = closest / step
         dLat = (latitude - olatitude) / divisions
         dLon = (longitude - olongitude) / divisions
+
+        logging.info("Walking %f meters. This will take %f seconds..." % (dist, dist/step))
+
         while dist > epsilon:
             logging.info("%f m -> %f m away", closest - dist, closest)
             latitude -= dLat * (1 + (random.random() -0.5))

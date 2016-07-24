@@ -9,6 +9,7 @@ from custom_exceptions import GeneralPogoException
 from api import PokeAuthSession
 from location import Location
 
+from pokedex import pokedex
 
 def setupLogger():
     logger = logging.getLogger()
@@ -29,23 +30,25 @@ def getProfile(session):
 
 
 # Grab the nearest pokemon details
-def findClosestPokemon(session):
+def findBestPokemon(session):
     # Get Map details and print pokemon
-    logging.info("Printing Nearby Pokemon:")
+    logging.info("Finding Nearby Pokemon:")
     cells = session.getMapObjects()
     closest = float("Inf")
+    best = -1
     pokemonBest = None
     latitude, longitude, _ = session.getCoordinates()
+    logging.info("Current pos: %f, %f" % (latitude, longitude))
     for cell in cells.map_cells:
-        for pokemon in cell.wild_pokemons:
-            # Log the pokemon found
-            logging.info("%i at %f,%f" % (
-                pokemon.pokemon_data.pokemon_id,
-                pokemon.latitude,
-                pokemon.longitude
-            ))
+        # Heap in pokemon protos where we have long + lat
+        pokemons = [p for p in cell.wild_pokemons] + [p for p in cell.catchable_pokemons]
+        for pokemon in pokemons:
+            # Normalize the ID from different protos
+            pokemonId = getattr(pokemon, "pokemon_id", None)
+            if not pokemonId:
+                pokemonId = pokemon.pokemon_data.pokemon_id
 
-            # Fins distance to pokemon
+            # Find distance to pokemon
             dist = Location.getDistance(
                 latitude,
                 longitude,
@@ -53,17 +56,30 @@ def findClosestPokemon(session):
                 pokemon.longitude
             )
 
-            # Greedy for closest
-            if dist < closest:
+            # Log the pokemon found
+            logging.info("%s, %f meters away" % (
+                pokedex.Pokemons[pokemonId],
+                dist
+            ))
+
+            rarity = pokedex.RarityByNumber(pokemonId)
+            # Greedy for rarest
+            if rarity > best:
                 pokemonBest = pokemon
+                best = rarity
+                closest = dist
+            # Greedy for closest of same rarity
+            elif rarity == best and dist < closest:
+                pokemonBest = pokemon
+                closest = dist
     return pokemonBest
 
 
 # Catch a pokemon at a given point
 def walkAndCatch(session, pokemon):
     if pokemon:
-        logging.info("Catching nearest pokemon:")
-        session.walkTo(pokemon.latitude, pokemon.longitude)
+        logging.info("Catching %s:" % pokedex.Pokemons[pokemon.pokemon_data.pokemon_id])
+        session.walkTo(pokemon.latitude, pokemon.longitude, step=3.2)
         logging.info(session.encounterAndCatch(pokemon))
 
 
@@ -111,8 +127,9 @@ def walkAndSpin(session, fort):
     if fort:
         logging.info("Spinning a Fort:")
         # Walk over
-        session.walkTo(fort.latitude, fort.longitude)
+        session.walkTo(fort.latitude, fort.longitude, step=3.2)
         # Give it a spin
+        logging.info(session.getFortDetails(fort))
         fortResponse = session.getFortSearch(fort)
         logging.info(fortResponse)
 
@@ -120,7 +137,7 @@ def walkAndSpin(session, fort):
 # Walk and spin everywhere
 def walkAndSpinMany(session, forts):
     for fort in forts:
-        walkAndSpin(fort)
+        walkAndSpin(session, fort)
 
 
 # A very brute force approach to evolving
@@ -171,7 +188,7 @@ def simpleBot(session):
         try:
             forts = sortCloseForts(session)
             for fort in forts:
-                pokemon = findClosestPokemon(session)
+                pokemon = findBestPokemon(session)
                 walkAndCatch(session, pokemon)
                 walkAndSpin(session, fort)
                 cooldown = 1
