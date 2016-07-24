@@ -24,6 +24,7 @@ from state import State
 import requests
 import logging
 import time
+import random
 
 # Hide errors (Yes this is terrible, but prettier)
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -327,10 +328,10 @@ class PogoSession(object):
             request_message=CatchPokemonMessage_pb2.CatchPokemonMessage(
                 encounter_id=pokemon.encounter_id,
                 pokeball=pokeball,
-                normalized_reticle_size=1.950,
+                normalized_reticle_size= random.random() + 1.0,
                 spawn_point_guid=pokemon.spawn_point_id,
                 hit_pokemon=True,
-                spin_modifier=0.850,
+                spin_modifier=0,
                 normalized_hit_position=1.0
             ).SerializeToString()
         )]
@@ -448,13 +449,13 @@ class PogoSession(object):
         dLon = (longitude - olongitude) / divisions
         while dist > epsilon:
             logging.info("%f m -> %f m away", closest - dist, closest)
-            latitude -= dLat
-            longitude -= dLon
+            latitude -= dLat * (1 + (random.random() -0.5))
+            longitude -= dLon * (1 + (random.random() -0.5))
             self.setCoordinates(
                 latitude,
                 longitude
             )
-            time.sleep(1)
+            time.sleep(5)
             dist = Location.getDistance(
                 latitude,
                 longitude,
@@ -464,7 +465,7 @@ class PogoSession(object):
 
     # Wrap both for ease
     # TODO: Should probably check for success
-    def encounterAndCatch(self, pokemon, pokeball=1, delay=2):
+    def encounterAndCatch(self, pokemon, pokeball=1, delay=5):
         self.encounterPokemon(pokemon)
         time.sleep(delay)
         return self.catchPokemon(pokemon, pokeball)

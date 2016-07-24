@@ -55,9 +55,7 @@ class PokeAuthSession(object):
 
         # determine location
         location = None
-        if session:
-            location = session.location
-        elif locationLookup:
+        if locationLookup:
             location = Location(locationLookup, self.geo_key)
             logging.info(location)
 

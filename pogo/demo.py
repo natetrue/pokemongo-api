@@ -3,6 +3,7 @@ import argparse
 import logging
 import time
 import sys
+import random
 from custom_exceptions import GeneralPogoException
 
 from api import PokeAuthSession
@@ -209,33 +210,45 @@ if __name__ == '__main__':
         logging.error('Invalid auth service {}'.format(args.auth))
         sys.exit(-1)
 
-    # Create PokoAuthObject
-    poko_session = PokeAuthSession(
-        args.username,
-        args.password,
-        args.auth,
-        geo_key=args.geo_key
-    )
+    while True:
+        try:
+            # Create PokoAuthObject
+            poko_session = PokeAuthSession(
+                args.username,
+                args.password,
+                args.auth,
+                geo_key=args.geo_key
+            )
 
-    # Authenticate with a given location
-    # Location is not inherent in authentication
-    # But is important to session
-    session = poko_session.authenticate(args.location)
+            # Authenticate with a given location
+            # Location is not inherent in authentication
+            # But is important to session
+            session = poko_session.authenticate(args.location)
 
-    # Time to show off what we can do
-    if session:
+            # Time to show off what we can do
+            if session:
 
-        # General
-        getProfile(session)
-        getInventory(session)
+                # General
+                getProfile(session)
+                getInventory(session)
 
-        # Pokemon related
-        pokemon = findClosestPokemon(session)
-        walkAndCatch(session, pokemon)
+                while True:
+                    # Pokemon related
+                    pokemon = findClosestPokemon(session)
+                    walkAndCatch(session, pokemon)
 
-        # Pokestop related
-        fort = findClosestFort(session)
-        walkAndSpin(session, fort)
+                    session.walkTo(session.location.latitude, session.location.longitude + 0.0001)
 
-    else:
-        logging.critical('Session not created successfully')
+                    time.sleep(10)
+
+                    # Pokestop related
+                    fort = random.sample(sortCloseForts(session), 1)[0]
+                    walkAndSpin(session, fort)
+
+                    time.sleep(10)
+
+            else:
+                logging.critical('Session not created successfully')
+        except:
+            print sys.exc_info()
+            time.sleep(300)
